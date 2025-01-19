@@ -1,0 +1,616 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project_status.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Search projects...">
+            <button class="filter-btn" onclick="toggleFilters()">
+                <i class="fas fa-filter"></i>
+            </button>
+        </div>
+        
+        <div class="search-filters" id="filters-panel" style="display: none;">
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="status-filter">
+                    <option value="">All</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Goal Amount</label>
+                <div class="goal-inputs">
+                    <input type="number" id="min-goal" placeholder="Min ETH">
+                    <input type="number" id="max-goal" placeholder="Max ETH">
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <label>Sort By</label>
+                <select id="sort-by">
+                    <option value="recent">Most Recent</option>
+                    <option value="goal">Highest Goal</option>
+                    <option value="progress">Most Progress</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Feed -->
+    <div class="projects-feed" id="projects-container">
+        {% for project in projects %}
+        <div class="project-card {% if project.status == 'inactive' %}deactivated-theme{% endif %}" 
+             onclick="goToProject('{{ project.id }}', event)"
+             data-project-id="{{ project.id }}"
+             data-funds-raised="{{ project.funds_raised|default(0, true) }}"
+             data-goal-amount="{{ project.goal_amount }}"
+             data-creator-id="{{ project.created_by }}">
+            <div class="project-header">
+                <div class="header-top">
+                    <h3 title="{{ project.title|e }}">{{ project.title[:40]|e }}{% if project.title|length > 40 %}...{% endif %}</h3>
+                </div>
+                {% if current_user.is_authenticated and project.created_by != current_user.id and project.status == 'active' %}
+                <button class="donate-btn" onclick="event.stopPropagation(); event.preventDefault(); showDonateModal('{{ project.id }}', '{{ project.title|e }}')">
+                    <i class="fas fa-hand-holding-usd"></i>Donate
+                </button>
+                {% elif not current_user.is_authenticated and project.status == 'active' %}
+                <button class="donate-btn" onclick="event.stopPropagation(); event.preventDefault(); window.location.href='{{ url_for('auth.login') }}'">
+                    <i class="fas fa-hand-holding-usd"></i>Login to Donate
+                </button>
+                {% endif %}
+            </div>
+            
+            <div class="project-body">
+                <p class="project-description">{{ project.description[:200]|e }}...</p>
+                
+                <div class="funding-progress">
+                    <div class="progress-stats">
+                        <span class="raised">{{ project.funds_raised|default(0, true) }} ETH</span>
+                        <span class="goal">of {{ project.goal_amount }} ETH goal</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int }}%" data-funds="{{ project.funds_raised|default(0, true) }}" data-goal="{{ project.goal_amount }}"></div>
+                    </div>
+                    <div class="progress-percentage" data-funds="{{ project.funds_raised|default(0, true) }}" data-goal="{{ project.goal_amount }}">
+                        {{ ((project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int) }}% funded
+                    </div>
+                </div>
+
+                <div class="project-card__status-container">
+                    <div class="project-card__status-section">
+                        <div class="project-card__status-left">
+                            <span class="project-card__status project-card__status--{{ project.status }}">{{ project.status|title }}</span>
+                        </div>
+                        <div class="project-card__votes">
+                            {% if current_user.is_authenticated %}
+                            <button class="project-card__vote-button project-card__vote-button--upvote" title="Upvote" onclick="handleVote(event, '{{ project.id }}', 'up')">
+                                <i class="fas fa-arrow-up"></i> {{ project.upvotes|default(0) }}
+                            </button>
+                            <button class="project-card__vote-button project-card__vote-button--downvote" title="Downvote" onclick="handleVote(event, '{{ project.id }}', 'down')">
+                                <i class="fas fa-arrow-down"></i> {{ project.downvotes|default(0) }}
+                            </button>
+                            {% else %}
+                            <div class="project-card__vote-display">
+                                <span title="Upvotes"><i class="fas fa-arrow-up"></i> {{ project.upvotes|default(0) }}</span>
+                                <span title="Downvotes"><i class="fas fa-arrow-down"></i> {{ project.downvotes|default(0) }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="creator-info">
+                    <div class="creator-avatar">{{ project.creator_name[0]|upper }}</div>
+                    <div class="creator-details">
+                        <span class="creator-name">{{ project.creator_name }}</span>
+                        <span class="creation-date">Created {{ moment(project.created_at).fromNow() }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="loading-indicator">
+        <div class="loading-animation">
+            <div class="pulse-ring"></div>
+            <div class="spinner-dots">
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+        </div>
+        <span>Loading more projects...</span>
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <!-- Donate Modal -->
+    <div id="donate-modal" class="modal" style="z-index: 1000;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Support this Project</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="donationAmount">Amount (ETH)</label>
+                    <input type="number" 
+                           id="donationAmount" 
+                           name="amount"
+                           class="form-control"
+                           step="0.01" 
+                           min="0.01" 
+                           placeholder="0.00"
+                           required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="submitDonation(event)" class="donate-btn">
+                    <i class="fas fa-hand-holding-usd"></i>Donate
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Scroll behavior for search section
+let lastScrollY = window.scrollY;
+let ticking = false;
+
+function updateSearchVisibility() {
+    const searchSection = document.querySelector('.search-section');
+    const currentScrollY = window.scrollY;
+    
+    // Show search when scrolling up or at top
+    if (currentScrollY < lastScrollY || currentScrollY < 100) {
+        searchSection.classList.remove('hidden');
+    } 
+    // Hide search when scrolling down and not at top
+    else if (currentScrollY > 100) {
+        searchSection.classList.add('hidden');
+    }
+    
+    lastScrollY = currentScrollY;
+    ticking = false;
+}
+
+window.addEventListener('scroll', () => {
+    if (!ticking) {
+        window.requestAnimationFrame(() => {
+            updateSearchVisibility();
+        });
+        ticking = true;
+    }
+});
+
+// Original search and filter functionality
+let debounceTimer;
+let currentPage = 1;
+let isLoading = false;
+let hasMore = true;
+
+// Search functionality
+document.getElementById('search-input').addEventListener('input', function(e) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => performSearch(), 300);
+});
+
+// Filter toggle
+function toggleFilters() {
+    const filtersPanel = document.getElementById('filters-panel');
+    filtersPanel.style.display = filtersPanel.style.display === 'none' ? 'block' : 'none';
+}
+
+// Search and filters
+function performSearch() {
+    const query = document.getElementById('search-input').value;
+    const status = document.getElementById('status-filter').value;
+    const minGoal = document.getElementById('min-goal').value;
+    const maxGoal = document.getElementById('max-goal').value;
+    const sortBy = document.getElementById('sort-by').value;
+    
+    const params = new URLSearchParams({
+        q: query,
+        status: status,
+        min_goal: minGoal,
+        max_goal: maxGoal,
+        sort_by: sortBy
+    });
+    
+    fetch(`/search-projects?${params}`)
+        .then(response => response.json())
+        .then(projects => {
+            const container = document.getElementById('projects-container');
+            
+            if (!projects.length) {
+                container.innerHTML = `
+                    <div class="no-projects">
+                        <p>No projects found matching your criteria.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = projects.map(project => {
+                const escapedTitle = escapeHtml(project.title);
+                const escapedDescription = escapeHtml(project.description);
+                const donateButton = {% if current_user.is_authenticated %}`
+                    ${project.created_by !== '{{ current_user.id }}' && project.status === 'active' ? 
+                        `<button class="donate-btn" onclick="event.stopPropagation(); event.preventDefault(); showDonateModal('${project.id}', '${escapedTitle}')">
+                            <i class="fas fa-hand-holding-usd"></i>Donate
+                        </button>` : ''}`{% else %}`
+                    ${project.status === 'active' ? 
+                        `<button class="donate-btn" onclick="event.stopPropagation(); event.preventDefault(); window.location.href='{{ url_for('auth.login') }}'">
+                            <i class="fas fa-hand-holding-usd"></i>Login to Donate
+                        </button>` : ''}`{% endif %};
+                
+                const votingButtons = {% if current_user.is_authenticated %}`
+                    <button class="project-card__vote-button project-card__vote-button--upvote" title="Upvote" onclick="handleVote(event, '${project.id}', 'up')">
+                        <i class="fas fa-arrow-up"></i> ${project.upvotes || 0}
+                    </button>
+                    <button class="project-card__vote-button project-card__vote-button--downvote" title="Downvote" onclick="handleVote(event, '${project.id}', 'down')">
+                        <i class="fas fa-arrow-down"></i> ${project.downvotes || 0}
+                    </button>`{% else %}`
+                    <div class="project-card__vote-display">
+                        <span title="Upvotes"><i class="fas fa-arrow-up"></i> ${project.upvotes || 0}</span>
+                        <span title="Downvotes"><i class="fas fa-arrow-down"></i> ${project.downvotes || 0}</span>
+                    </div>`{% endif %};
+
+                return `
+                    <div class="project-card ${project.status === 'inactive' ? 'deactivated-theme' : ''}" 
+                         onclick="goToProject('${project.id}', event)"
+                         data-project-id="${project.id}"
+                         data-funds-raised="${project.funds_raised || 0}"
+                         data-goal-amount="${project.goal_amount}"
+                         data-creator-id="${project.created_by}">
+                        <div class="project-header">
+                            <div class="header-top">
+                                <h3 title="${escapedTitle}">${escapedTitle.slice(0, 40)}${escapedTitle.length > 40 ? '...' : ''}</h3>
+                            </div>
+                            ${donateButton}
+                        </div>
+                        
+                        <div class="project-body">
+                            <p class="project-description">${escapedDescription.slice(0, 200)}...</p>
+                            
+                            <div class="funding-progress">
+                                <div class="progress-stats">
+                                    <span class="raised">${project.funds_raised || 0} ETH</span>
+                                    <span class="goal">of ${project.goal_amount} ETH goal</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${Math.round((project.funds_raised || 0) / project.goal_amount * 100)}%" data-funds="${project.funds_raised || 0}" data-goal="${project.goal_amount}"></div>
+                                </div>
+                                <div class="progress-percentage" data-funds="${project.funds_raised || 0}" data-goal="${project.goal_amount}">
+                                    ${Math.round((project.funds_raised || 0) / project.goal_amount * 100)}% funded
+                                </div>
+                            </div>
+
+                            <div class="project-card__status-container">
+                                <div class="project-card__status-section">
+                                    <div class="project-card__status-left">
+                                        <span class="project-card__status project-card__status--${project.status}">${project.status.charAt(0).toUpperCase() + project.status.slice(1)}</span>
+                                    </div>
+                                    <div class="project-card__votes">
+                                        ${votingButtons}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="creator-info">
+                                <div class="creator-avatar">${project.creator_name[0].toUpperCase()}</div>
+                                <div class="creator-details">
+                                    <span class="creator-name">${project.creator_name}</span>
+                                    <span class="creation-date">Created ${moment(project.created_at).fromNow()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        })
+        .catch(error => {
+            console.error('Error searching projects:', error);
+        });
+}
+
+// Function to create project card HTML
+function createProjectCard(project) {
+    const escapedTitle = escapeHtml(project.title);
+    const escapedDescription = escapeHtml(project.description);
+    const donateButton = {% if current_user.is_authenticated %}`
+        ${project.created_by !== '{{ current_user.id }}' && project.status === 'active' ? 
+            `<button class="donate-btn" onclick="event.stopPropagation(); event.preventDefault(); showDonateModal('${project.id}', '${escapedTitle}')">
+                <i class="fas fa-hand-holding-usd"></i>Donate
+            </button>` : ''}`{% else %}`
+        ${project.status === 'active' ? 
+            `<button class="donate-btn" onclick="event.stopPropagation(); event.preventDefault(); window.location.href='{{ url_for('auth.login') }}'">
+                <i class="fas fa-hand-holding-usd"></i>Login to Donate
+            </button>` : ''}`{% endif %};
+    
+    const votingButtons = {% if current_user.is_authenticated %}`
+        <button class="project-card__vote-button project-card__vote-button--upvote" title="Upvote" onclick="handleVote(event, '${project.id}', 'up')">
+            <i class="fas fa-arrow-up"></i> ${project.upvotes || 0}
+        </button>
+        <button class="project-card__vote-button project-card__vote-button--downvote" title="Downvote" onclick="handleVote(event, '${project.id}', 'down')">
+            <i class="fas fa-arrow-down"></i> ${project.downvotes || 0}
+        </button>`{% else %}`
+        <div class="project-card__vote-display">
+            <span title="Upvotes"><i class="fas fa-arrow-up"></i> ${project.upvotes || 0}</span>
+            <span title="Downvotes"><i class="fas fa-arrow-down"></i> ${project.downvotes || 0}</span>
+        </div>`{% endif %};
+    
+    return `
+        <div class="project-card ${project.status === 'inactive' ? 'deactivated-theme' : ''}" 
+             onclick="goToProject('${project.id}', event)"
+             data-project-id="${project.id}"
+             data-funds-raised="${project.funds_raised || 0}"
+             data-goal-amount="${project.goal_amount}"
+             data-creator-id="${project.created_by}">
+            <div class="project-header">
+                <div class="header-top">
+                    <h3 title="${escapedTitle}">${escapedTitle.slice(0, 40)}${escapedTitle.length > 40 ? '...' : ''}</h3>
+                </div>
+                ${donateButton}
+            </div>
+            
+            <div class="project-body">
+                <p class="project-description">${escapedDescription.slice(0, 200)}...</p>
+                
+                <div class="funding-progress">
+                    <div class="progress-stats">
+                        <span class="raised">${project.funds_raised || 0} ETH</span>
+                        <span class="goal">of ${project.goal_amount} ETH goal</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${Math.round((project.funds_raised || 0) / project.goal_amount * 100)}%" data-funds="${project.funds_raised || 0}" data-goal="${project.goal_amount}"></div>
+                    </div>
+                    <div class="progress-percentage" data-funds="${project.funds_raised || 0}" data-goal="${project.goal_amount}">
+                        ${Math.round((project.funds_raised || 0) / project.goal_amount * 100)}% funded
+                    </div>
+                </div>
+
+                <div class="project-card__status-container">
+                    <div class="project-card__status-section">
+                        <div class="project-card__status-left">
+                            <span class="project-card__status project-card__status--${project.status}">${project.status.charAt(0).toUpperCase() + project.status.slice(1)}</span>
+                        </div>
+                        <div class="project-card__votes">
+                            ${votingButtons}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="creator-info">
+                    <div class="creator-avatar">${project.creator_name[0].toUpperCase()}</div>
+                    <div class="creator-details">
+                        <span class="creator-name">${project.creator_name}</span>
+                        <span class="creation-date">Created ${moment(project.created_at).fromNow()}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Function to load more projects
+async function loadMoreProjects() {
+    if (isLoading || !hasMore) return;
+    
+    isLoading = true;
+    document.getElementById('loading-indicator').style.display = 'flex';
+    
+    try {
+        const response = await fetch(`/api/projects?page=${currentPage + 1}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        const projectsContainer = document.getElementById('projects-container');
+        data.projects.forEach(project => {
+            projectsContainer.insertAdjacentHTML('beforeend', createProjectCard(project));
+        });
+        
+        currentPage++;
+        hasMore = data.has_more;
+        
+        if (!hasMore) {
+            document.getElementById('loading-indicator').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading more projects:', error);
+    } finally {
+        isLoading = false;
+        document.getElementById('loading-indicator').style.display = 'none';
+    }
+}
+
+// Infinite scroll handler
+function handleScroll() {
+    const scrollPosition = window.innerHeight + window.scrollY;
+    const bodyHeight = document.documentElement.scrollHeight;
+    
+    // Load more when user scrolls to bottom (with 200px threshold)
+    if (scrollPosition >= bodyHeight - 200) {
+        loadMoreProjects();
+    }
+}
+
+// Add scroll event listener
+window.addEventListener('scroll', handleScroll);
+
+// Add this to your existing JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Update progress bars
+    document.querySelectorAll('.progress-fill').forEach(fill => {
+        const funds = parseFloat(fill.dataset.funds);
+        const goal = parseFloat(fill.dataset.goal);
+        const progress = Math.round((funds / goal) * 100);
+        fill.style.width = `${progress}%`;
+        
+        // Update percentage text
+        const percentageEl = fill.closest('.funding-progress').querySelector('.progress-percentage');
+        percentageEl.textContent = `${progress}% funded`;
+    });
+});
+
+// HTML escaping function
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function goToProject(projectId, event) {
+    window.location.href = `/view-project/${projectId}`;
+}
+
+{% if current_user.is_authenticated %}
+function showDonateModal(projectId, projectTitle) {
+    const modal = document.getElementById('donate-modal');
+    modal.style.display = 'block';
+    modal.dataset.projectId = projectId;
+    modal.dataset.projectTitle = projectTitle;
+    
+    // Close modal when clicking the close button
+    modal.querySelector('.close').onclick = function() {
+        modal.style.display = 'none';
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+}
+
+// Toast notification function
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    const icon = type === 'success' 
+        ? '<i class="fas fa-check-circle"></i>'
+        : '<i class="fas fa-exclamation-circle"></i>';
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            ${icon}
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.getElementById('toast-container').appendChild(toast);
+    
+    // Show the toast
+    setTimeout(() => toast.classList.add('show'), 100);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+function submitDonation(event) {
+    event.preventDefault();
+    const modal = document.getElementById('donate-modal');
+    const projectId = modal.dataset.projectId;
+    const amount = document.getElementById('donationAmount').value;
+    
+    if (!amount || amount <= 0) {
+        showToast('Please enter a valid donation amount', 'error');
+        return;
+    }
+
+    // Show loading state
+    const donateBtn = modal.querySelector('.donate-btn');
+    const originalText = donateBtn.innerHTML;
+    donateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Processing...';
+    donateBtn.disabled = true;
+
+    // Make API call to process donation
+    fetch(`/api/donate/${projectId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: parseFloat(amount) })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal first
+            modal.style.display = 'none';
+            // Show success message
+            showToast('Donation successful! Thank you for your support.');
+            // Wait for toast to appear before reloading
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            // Show error message
+            showToast(data.error || 'Failed to process donation. Please try again.', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error processing donation:', error);
+        showToast('An error occurred while processing your donation. Please try again.', 'error');
+    })
+    .finally(() => {
+        // Reset button state
+        donateBtn.innerHTML = originalText;
+        donateBtn.disabled = false;
+        // Reset the form
+        document.getElementById('donationAmount').value = '';
+    });
+}
+
+function handleVote(event, projectId, voteType) {
+    event.stopPropagation();
+    fetch('/api/vote/' + projectId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ vote_type: voteType })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update vote count in UI
+            location.reload();  // Temporary solution - ideally update just the vote counts
+        } else {
+            console.error('Vote failed:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error voting:', error);
+    });
+}
+{% endif %}
+</script>
+{% endblock %} 

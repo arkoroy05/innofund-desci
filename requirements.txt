@@ -1,0 +1,8 @@
+Flask
+python-dotenv
+firebase-admin
+requests
+requests-oauthlib
+flask-login
+flask-moment
+Werkzeug

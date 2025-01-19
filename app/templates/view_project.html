@@ -1,0 +1,1341 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/view_project.css') }}">
+<style>
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--dark-bg, #1a1a1a);
+    color: var(--text-primary, #ffffff);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    padding: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    position: relative;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary, #ffffff);
+    flex-grow: 1;
+    text-align: center;
+}
+
+.modal-header .close {
+    position: absolute;
+    right: 1.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-secondary, #718096);
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.modal-header .close:hover {
+    color: var(--text-primary, #ffffff);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-body {
+    padding: 1.25rem;
+}
+
+.modal-footer {
+    padding: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary, #ffffff);
+    font-size: 0.95rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: var(--text-primary, #ffffff);
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+/* Poll Styles */
+.poll-section {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+}
+
+.poll-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.poll-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.poll-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.create-poll-btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    color: #818cf8;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.create-poll-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.delete-poll-btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-poll-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: translateY(-1px);
+}
+
+.poll-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.poll-option {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.poll-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.poll-option.voted {
+    border-color: #818cf8;
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.poll-option-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.poll-progress {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.poll-progress-bar {
+    height: 100%;
+    background: #818cf8;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.poll-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.poll-preview {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.poll-preview h4 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.poll-preview-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.poll-preview-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+}
+
+.poll-preview-option .vote-count {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.btn-danger {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-danger i {
+    font-size: 0.875rem;
+}
+
+.login-to-vote {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.login-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.login-message i {
+    color: #818cf8;
+    font-size: 1rem;
+}
+
+.login-btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    color: #818cf8;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.login-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+
+.login-btn i {
+    font-size: 0.875rem;
+}
+
+/* Modal Button Styles */
+.modal-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-btn-primary {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #818cf8;
+}
+
+.modal-btn-primary:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.modal-btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+}
+
+.modal-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.modal-btn-danger {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.modal-btn-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: translateY(-1px);
+}
+
+.modal-btn i {
+    font-size: 0.875rem;
+}
+
+.add-option-btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    color: #818cf8;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.add-option-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.add-option-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.add-option-btn i {
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="project-view-container {% if project.status == 'inactive' %}deactivated-theme{% endif %}">
+    <div class="project-header-section">
+        <div class="project-main-info">
+            <h1 title="{{ project.title }}">{{ project.title }}</h1>
+            <div class="project-creator">
+                <div class="creator-avatar">
+                    {% if creator and creator.photo_url %}
+                        <img src="{{ creator.photo_url }}" alt="{{ creator.display_name }}">
+                    {% else %}
+                        <span>{{ project.creator_name[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="creator-info">
+                    <a href="{{ url_for('main.public_profile', user_id=project.created_by) }}" class="creator-name">
+                        {{ project.creator_name }}
+                    </a>
+                    <span class="creation-date">Created {{ moment(project.created_at).fromNow() }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="project-actions">
+            <div class="action-buttons">
+                {% if is_owner %}
+                    {% if project.status == 'active' %}
+                    <button type="button" class="deactivate-btn" onclick="showDeactivateModal()">
+                        <i class="fas fa-power-off"></i> Deactivate Project
+                    </button>
+                    {% endif %}
+                {% else %}
+                    {% if project.status == 'active' %}
+                        {% if current_user.is_authenticated %}
+                    <button type="button" class="donate-btn" onclick="event.preventDefault(); event.stopPropagation(); showDonateModal('{{ project.id }}', '{{ project.title|e }}')">
+                        <i class="fas fa-hand-holding-usd"></i>Donate
+                    </button>
+                        {% else %}
+                        <a href="{{ url_for('auth.login') }}" class="donate-btn">
+                            <i class="fas fa-hand-holding-usd"></i>Login to Donate
+                        </a>
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+            </div>
+            
+            <div class="share-buttons">
+                <button onclick="shareProject('twitter')" class="share-btn twitter">
+                    <i class="fab fa-twitter"></i>
+                </button>
+                <button onclick="shareProject('linkedin')" class="share-btn linkedin">
+                    <i class="fab fa-linkedin"></i>
+                </button>
+                <button onclick="copyProjectLink()" class="share-btn copy">
+                    <i class="fas fa-link"></i>
+                </button>
+            </div>
+            
+            <div class="voting-buttons" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1.5rem; margin-left: 0.25rem;">
+                {% if current_user.is_authenticated %}
+                <button onclick="voteProject('{{ project.id }}', 'up')" 
+                        class="vote-btn upvote {% if user_vote == 'up' %}voted{% endif %}" 
+                        style="display: inline-flex; align-items: center; gap: 0.4rem; background: none; border: none; padding: 0.4rem; cursor: pointer; transition: all 0.2s ease; color: var(--text-secondary, #718096); position: relative; text-decoration: none;"
+                        title="{% if user_vote == 'up' %}Remove upvote{% else %}Upvote{% endif %}">
+                    <i class="fas fa-arrow-up"></i>
+                    <span class="vote-count">{{ project.upvotes|default(0) }}</span>
+                </button>
+                <button onclick="voteProject('{{ project.id }}', 'down')" 
+                        class="vote-btn downvote {% if user_vote == 'down' %}voted{% endif %}" 
+                        style="display: inline-flex; align-items: center; gap: 0.4rem; background: none; border: none; padding: 0.4rem; cursor: pointer; transition: all 0.2s ease; color: var(--text-secondary, #718096); position: relative; text-decoration: none;"
+                        title="{% if user_vote == 'down' %}Remove downvote{% else %}Downvote{% endif %}">
+                    <i class="fas fa-arrow-down"></i>
+                    <span class="vote-count">{{ project.downvotes|default(0) }}</span>
+                </button>
+                {% else %}
+                <div class="vote-display">
+                    <span class="vote-stat" title="Upvotes">
+                        <i class="fas fa-arrow-up"></i>
+                        <span class="vote-count">{{ project.upvotes|default(0) }}</span>
+                    </span>
+                    <span class="vote-stat" title="Downvotes">
+                        <i class="fas fa-arrow-down"></i>
+                        <span class="vote-count">{{ project.downvotes|default(0) }}</span>
+                    </span>
+                </div>
+                {% endif %}
+                
+                {% if current_user.is_authenticated %}
+                <button onclick="showReportModal('{{ project.id }}')"
+                        class="report-btn"
+                        data-authenticated="{{ current_user.is_authenticated|tojson }}"
+                        style="background: none; border: none; color: rgba(255, 0, 60, 0.7); cursor: pointer; padding: 0.5rem; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 0, 60, 0.1); margin-left: 0.5rem;"
+                        title="Report Project">
+                    <i class="fas fa-flag" style="font-size: 1rem;"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="project-content">
+        <div class="project-main">
+            <div class="funding-status {% if project.status == 'inactive' %}deactivated-theme{% endif %}">
+                <div class="funding-progress">
+                    <div class="progress-stats">
+                        <span class="raised">{{ project.funds_raised|default(0, true) }} ETH</span>
+                        <span class="goal">{{ project.goal_amount }} ETH</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int }}%"></div>
+                    </div>
+                    <div class="progress-percentage">
+                        {{ ((project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int) }}% funded
+                    </div>
+                </div>
+                
+                <div class="funding-meta">
+                    <div class="meta-item">
+                        <span class="label">Status</span>
+                        <span class="value status-{{ project.status }}">{{ project.status|title }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="label">Team Members</span>
+                        <span class="value">{{ project.team_members|length }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="project-description">
+                <h2>About the Project</h2>
+                <div class="description-content">
+                    {{ project.description }}
+                </div>
+            </div>
+
+            {% if project.citations %}
+            <div class="project-citations">
+                <h2>Citations & References</h2>
+                <div class="citations-content">
+                    {{ project.citations|safe }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if project.documents %}
+            <div class="project-documents">
+                <h2>Project Documents</h2>
+                <div class="documents-grid">
+                    {% for doc in project.documents %}
+                    <a href="{{ doc.url }}" target="_blank" class="document-item">
+                        <span class="doc-name">{{ doc.name }}</span>
+                        <span class="doc-action">View →</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Poll Section -->
+            <div class="poll-section">
+                <div class="poll-header">
+                    <h3 class="poll-title">Project Poll</h3>
+                    {% if project.created_by == current_user.id %}
+                    <div class="poll-actions">
+                        <button class="create-poll-btn" onclick="openCreatePollModal()">
+                            <i class="fas fa-poll"></i> Create Poll
+                        </button>
+                        {% if project.poll %}
+                        <button class="delete-poll-btn" onclick="openDeletePollModal()">
+                            <i class="fas fa-trash"></i> Delete Poll
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if project.poll %}
+                <div class="poll-options">
+                    <h4>{{ project.poll.question }}</h4>
+                    {% if current_user.is_authenticated %}
+                        {% for option in project.poll.options %}
+                        <div class="poll-option {% if current_user.id in option.voters %}voted{% endif %}" 
+                             onclick="votePoll('{{ option.id }}')">
+                            <div class="poll-option-text">{{ option.text }}</div>
+                            <div class="poll-progress">
+                                <div class="poll-progress-bar" style="width: {{ (option.votes / project.poll.total_votes * 100) if project.poll.total_votes > 0 else 0 }}%"></div>
+                            </div>
+                            <div class="poll-stats">
+                                <span>{{ option.votes }} votes</span>
+                                <span>{{ "%.1f"|format((option.votes / project.poll.total_votes * 100) if project.poll.total_votes > 0 else 0) }}%</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        {% for option in project.poll.options %}
+                        <div class="poll-option">
+                            <div class="poll-option-text">{{ option.text }}</div>
+                            <div class="poll-progress">
+                                <div class="poll-progress-bar" style="width: {{ (option.votes / project.poll.total_votes * 100) if project.poll.total_votes > 0 else 0 }}%"></div>
+                            </div>
+                            <div class="poll-stats">
+                                <span>{{ option.votes }} votes</span>
+                                <span>{{ "%.1f"|format((option.votes / project.poll.total_votes * 100) if project.poll.total_votes > 0 else 0) }}%</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <div class="login-to-vote">
+                            <div class="login-message">
+                                <i class="fas fa-lock"></i>
+                                <span>Sign in to participate in this poll</span>
+                            </div>
+                            <a href="{{ url_for('auth.login') }}" class="login-btn">
+                                <i class="fas fa-sign-in-alt"></i>
+                                Login to Vote
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted">No active poll</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="project-sidebar">
+            <div class="team-section">
+                <h3>Project Team</h3>
+                <div class="team-list">
+                    {% for member in project.team_members %}
+                    <div class="team-member" data-member-id="{{ member.id }}">
+                        <div class="member-avatar">
+                            {% if member.photo_url %}
+                                <img src="{{ member.photo_url }}" alt="{{ member.name }}">
+                            {% else %}
+                                <span>{{ member.name[0]|upper }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="member-info">
+                            <div class="member-name">{{ member.name }}</div>
+                            <div class="member-title">{{ member.title }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if project.transactions %}
+            <div class="transactions-section">
+                <h3>Recent Contributions</h3>
+                <div class="transactions-list">
+                    {% for tx in project.transactions[-5:] %}
+                    <div class="transaction-item">
+                        <div class="tx-info">
+                            <span class="tx-amount">{{ tx.amount }} ETH</span>
+                            <span class="tx-from">from {{ tx.contributor_name }}</span>
+                        </div>
+                        <span class="tx-date">{{ moment(tx.timestamp).fromNow() }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Donate Modal -->
+<div id="donate-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Support this Project</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="donationAmount">Amount (ETH)</label>
+                <input type="number" 
+                       id="donationAmount" 
+                       name="amount"
+                       class="form-control"
+                       step="0.01" 
+                       min="0.01" 
+                       placeholder="0.00"
+                       required>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="button" onclick="submitDonation(event)" class="modal-btn modal-btn-primary">
+                <i class="fas fa-hand-holding-usd"></i>Donate
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Modal -->
+<div id="report-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Report Project</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="reportReason">Reason</label>
+                <select id="reportReason" name="reason" class="form-control" required>
+                    <option value="">Select a reason...</option>
+                    <option value="inappropriate">Inappropriate Content</option>
+                    <option value="spam">Spam</option>
+                    <option value="scam">Potential Scam</option>
+                    <option value="duplicate">Duplicate Project</option>
+                    <option value="other">Other</option>
+                    </select>
+                </div>
+            <div class="form-group">
+                <label for="reportDetails">Additional Details</label>
+                <textarea id="reportDetails" name="details" class="form-control" rows="4" placeholder="Please provide more details about your report..."></textarea>
+                </div>
+                </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn-secondary" onclick="closeReportModal()">Cancel</button>
+            <button type="button" onclick="submitReport()" class="modal-btn modal-btn-primary">
+                <i class="fas fa-flag"></i>Submit Report
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Deactivation Modal -->
+<div id="deactivate-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Deactivate Project</h2>
+            <button class="close" onclick="closeDeactivateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to deactivate this project? This action cannot be undone.</p>
+            <p class="deactivate-warning">Once deactivated:</p>
+            <ul class="deactivate-consequences">
+                <li>The project will no longer accept donations</li>
+                <li>Project details will remain visible but marked as inactive</li>
+                <li>Existing donations will be preserved</li>
+            </ul>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-secondary" onclick="closeDeactivateModal()">Cancel</button>
+            <button class="modal-btn modal-btn-danger" onclick="confirmDeactivation()">
+                <i class="fas fa-power-off"></i>Deactivate Project
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Poll Modal -->
+<div id="createPollModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create Poll</h2>
+            <button type="button" class="close" onclick="closeCreatePollModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="createPollForm" onsubmit="submitPoll(event)">
+                <div class="form-group">
+                    <label for="pollQuestion">Question</label>
+                    <input type="text" class="form-control" id="pollQuestion" required
+                           placeholder="Enter your poll question">
+                </div>
+                <div id="pollOptions">
+                    <div class="form-group">
+                        <label>Options</label>
+                        <input type="text" class="form-control poll-option-input" required
+                               placeholder="Option 1">
+                        <input type="text" class="form-control poll-option-input mt-2" required
+                               placeholder="Option 2">
+                    </div>
+                </div>
+                <button type="button" class="add-option-btn" onclick="addPollOption()" id="addOptionBtn">
+                    <i class="fas fa-plus"></i>Add Option
+                </button>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn-secondary" onclick="closeCreatePollModal()">Cancel</button>
+            <button type="submit" form="createPollForm" class="modal-btn modal-btn-primary">
+                <i class="fas fa-poll"></i>Create Poll
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Poll Confirmation Modal -->
+<div id="deletePollModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Delete Poll</h2>
+            <button type="button" class="close" onclick="closeDeletePollModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this poll? This action cannot be undone.</p>
+            {% if project.poll %}
+            <div class="poll-preview">
+                <h4>{{ project.poll.question }}</h4>
+                <div class="poll-preview-options">
+                    {% for option in project.poll.options %}
+                    <div class="poll-preview-option">
+                        <span>{{ option.text }}</span>
+                        <span class="vote-count">{{ option.votes }} votes</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn-secondary" onclick="closeDeletePollModal()">Cancel</button>
+            <button type="button" class="modal-btn modal-btn-danger" onclick="confirmDeletePoll()">
+                <i class="fas fa-trash"></i>Delete Poll
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+{% if current_user.is_authenticated %}
+function showDonateModal(projectId, projectTitle) {
+    console.log('Opening donate modal for project:', projectId, projectTitle); // Debug log
+    const modal = document.getElementById('donate-modal');
+    if (!modal) {
+        console.error('Donate modal not found!');
+        return;
+    }
+    
+    modal.dataset.projectId = projectId;
+    modal.style.display = 'block';
+    document.body.classList.add('modal-open');
+    document.getElementById('donationAmount').value = '';
+}
+
+function closeModal() {
+    const modal = document.getElementById('donate-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+}
+
+// Initialize modal event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing modal event listeners'); // Debug log
+    
+    // Close button
+    const closeBtn = document.querySelector('#donate-modal .close');
+    if (closeBtn) {
+        closeBtn.onclick = closeModal;
+    }
+
+    // Click outside modal
+    const modal = document.getElementById('donate-modal');
+    if (modal) {
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        };
+    }
+
+    // Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeModal();
+        }
+    });
+});
+
+async function submitDonation(event) {
+    event.preventDefault();
+    const modal = document.getElementById('donate-modal');
+    const projectId = modal.dataset.projectId;
+    const amount = parseFloat(document.getElementById('donationAmount').value);
+    
+    if (amount <= 0 || isNaN(amount)) {
+        showToast('Please enter a valid amount', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/update-project-funds/${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ amount })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        if (result.success) {
+            closeModal();
+            showToast('Donation successful! Thank you for your support.', 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            throw new Error(result.error || 'Donation failed');
+        }
+    } catch (error) {
+        console.error('Donation error:', error);
+        showToast(error.message, 'error');
+    }
+}
+
+function showReportModal(projectId) {
+    const modal = document.getElementById('report-modal');
+    modal.style.display = 'block';
+    modal.dataset.projectId = projectId;
+    
+    // Close modal when clicking the close button
+    modal.querySelector('.close').onclick = function() {
+        modal.style.display = 'none';
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+}
+
+function submitReport() {
+    const modal = document.getElementById('report-modal');
+    const projectId = modal.dataset.projectId;
+    const reason = document.getElementById('reportReason').value;
+    const details = document.getElementById('reportDetails').value;
+    
+    if (!reason) {
+        showToast('Please select a reason for your report', 'error');
+        return;
+    }
+    
+    fetch('/report_project', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            project_id: projectId,
+            reason: reason,
+            details: details
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            showToast('Report submitted successfully', 'success');
+            modal.style.display = 'none';
+        } else {
+            throw new Error(data.error || 'Failed to submit report');
+        }
+    })
+    .catch(error => {
+        console.error('Error submitting report:', error);
+        showToast('Error submitting report: ' + error.message, 'error');
+    });
+}
+
+function voteProject(projectId, voteType) {
+    fetch('/api/vote/' + projectId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ vote_type: voteType })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();  // Refresh to update vote counts
+        } else {
+            showToast('Vote failed: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error voting:', error);
+        showToast('Error voting: ' + error.message, 'error');
+    });
+}
+
+function deactivateProject(projectId) {
+    if (!confirm('Are you sure you want to deactivate this project? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch('/deactivate-project/' + projectId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Project deactivated successfully', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(data.error || 'Failed to deactivate project');
+        }
+    })
+    .catch(error => {
+        console.error('Error deactivating project:', error);
+        showToast('Error deactivating project: ' + error.message, 'error');
+    });
+}
+{% endif %}
+
+// Toast notification system
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button onclick="this.parentElement.remove()" class="toast-close">&times;</button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Animate in
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+function shareProject(platform) {
+    const url = window.location.href;
+    const title = document.querySelector('h1').textContent;
+    
+    let shareUrl;
+    switch (platform) {
+        case 'twitter':
+            shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
+            break;
+        case 'linkedin':
+            shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+            break;
+    }
+    
+    if (shareUrl) {
+        window.open(shareUrl, '_blank', 'width=600,height=400');
+    }
+}
+
+function copyProjectLink() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Link copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy link:', err);
+        showToast('Failed to copy link', 'error');
+    });
+}
+
+// Add click handler for team members
+document.addEventListener('DOMContentLoaded', function() {
+    {% if current_user.is_authenticated %}
+    const teamMembers = document.querySelectorAll('.team-member');
+    teamMembers.forEach(member => {
+        member.addEventListener('click', function() {
+            const memberId = this.dataset.memberId;
+            window.location.href = `/profile/${memberId}`;
+        });
+    });
+    {% endif %}
+});
+
+// Deactivation Modal Functions
+function showDeactivateModal() {
+    document.getElementById('deactivate-modal').style.display = 'block';
+}
+
+function closeDeactivateModal() {
+    document.getElementById('deactivate-modal').style.display = 'none';
+}
+
+function confirmDeactivation() {
+    const projectId = '{{ project.id }}';
+    fetch(`/deactivate-project/${projectId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Project successfully deactivated', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(data.message || 'Failed to deactivate project', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('An error occurred while deactivating the project', 'error');
+    })
+    .finally(() => {
+        closeDeactivateModal();
+    });
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const deactivateModal = document.getElementById('deactivate-modal');
+    if (event.target === deactivateModal) {
+        closeDeactivateModal();
+    }
+}
+
+// Get project ID from the URL
+const projectId = window.location.pathname.split('/').pop();
+
+// Poll Functions
+function openCreatePollModal() {
+    document.getElementById('createPollModal').style.display = 'block';
+}
+
+function closeCreatePollModal() {
+    document.getElementById('createPollModal').style.display = 'none';
+    document.getElementById('createPollForm').reset();
+    // Reset options to initial two
+    const pollOptions = document.getElementById('pollOptions');
+    const optionInputs = pollOptions.getElementsByClassName('poll-option-input');
+    while (optionInputs.length > 2) {
+        optionInputs[optionInputs.length - 1].remove();
+    }
+}
+
+async function deletePoll() {
+    if (!confirm('Are you sure you want to delete this poll? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/delete_poll/${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('Poll deleted successfully', 'success');
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to delete poll', 'error');
+        }
+    } catch (error) {
+        showToast('Error deleting poll', 'error');
+        console.error('Error:', error);
+    }
+}
+
+function addPollOption() {
+    const pollOptions = document.getElementById('pollOptions');
+    const optionInputs = pollOptions.getElementsByClassName('poll-option-input');
+    
+    if (optionInputs.length >= 5) {
+        showToast('Maximum 5 options allowed', 'error');
+        return;
+    }
+    
+    const newInput = document.createElement('input');
+    newInput.type = 'text';
+    newInput.className = 'form-control poll-option-input mt-2';
+    newInput.required = true;
+    newInput.placeholder = `Option ${optionInputs.length + 1}`;
+    
+    pollOptions.firstElementChild.appendChild(newInput);
+    
+    // Disable add button if max reached
+    if (optionInputs.length >= 4) {
+        document.getElementById('addOptionBtn').disabled = true;
+    }
+}
+
+async function submitPoll(event) {
+    event.preventDefault();
+    
+    const question = document.getElementById('pollQuestion').value;
+    const optionInputs = document.getElementsByClassName('poll-option-input');
+    const options = Array.from(optionInputs).map(input => input.value).filter(val => val.trim());
+    
+    if (options.length < 2) {
+        showToast('Please provide at least 2 options', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/create_poll/${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question,
+                options
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('Poll created successfully', 'success');
+            closeCreatePollModal();
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to create poll', 'error');
+        }
+    } catch (error) {
+        showToast('Error creating poll', 'error');
+        console.error('Error:', error);
+    }
+}
+
+async function votePoll(optionId) {
+    try {
+        const response = await fetch(`/api/vote_poll/${projectId}/${optionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('Vote recorded successfully', 'success');
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to record vote', 'error');
+        }
+    } catch (error) {
+        showToast('Error recording vote', 'error');
+        console.error('Error:', error);
+    }
+}
+
+function openDeletePollModal() {
+    document.getElementById('deletePollModal').style.display = 'block';
+}
+
+function closeDeletePollModal() {
+    document.getElementById('deletePollModal').style.display = 'none';
+}
+
+async function confirmDeletePoll() {
+    try {
+        const response = await fetch(`/api/delete_poll/${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('Poll deleted successfully', 'success');
+            closeDeletePollModal();
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to delete poll', 'error');
+        }
+    } catch (error) {
+        showToast('Error deleting poll', 'error');
+        console.error('Error:', error);
+    }
+}
+
+// Update the onclick handler in the delete button
+document.querySelector('.delete-poll-btn').onclick = openDeletePollModal;
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const deletePollModal = document.getElementById('deletePollModal');
+    if (event.target === deletePollModal) {
+        closeDeletePollModal();
+    }
+    // Keep other modal close handlers
+    const deactivateModal = document.getElementById('deactivate-modal');
+    if (event.target === deactivateModal) {
+        closeDeactivateModal();
+    }
+}
+</script>
+{% endblock %} 

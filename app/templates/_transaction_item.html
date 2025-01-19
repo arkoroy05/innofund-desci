@@ -1,0 +1,125 @@
+<div class="transaction-content">
+    <div class="transaction-main">
+        <div class="transaction-info">
+            {% if tx.type in ['contribution', 'received'] %}
+                <a href="{{ url_for('main.view_project', project_id=tx.project.id) }}" class="project-link">
+                    {{ tx.project.title }}
+                </a>
+            {% else %}
+                <span class="transaction-with">
+                    {% if tx.type == 'token_exchange_sent' %}
+                        To: {{ tx.recipient_name }}
+                    {% else %}
+                        From: {{ tx.sender_name }}
+                    {% endif %}
+                </span>
+            {% endif %}
+            <span class="transaction-type {{ tx.type }}">
+                {% if tx.type == 'contribution' %}
+                    Contributed to project
+                {% elif tx.type == 'received' %}
+                    Received contribution
+                {% elif tx.type == 'token_exchange_sent' %}
+                    Token exchange sent
+                {% else %}
+                    Token exchange received
+                {% endif %}
+            </span>
+            {% if tx.message %}
+                <span class="transaction-message">"{{ tx.message }}"</span>
+            {% endif %}
+        </div>
+        <div class="transaction-meta">
+            <span class="transaction-amount {{ tx.type }}">
+                {% if tx.type in ['contribution', 'token_exchange_sent'] %}
+                    -{{ tx.amount }} {% if tx.type == 'contribution' %}ETH{% else %}AVAX{% endif %}
+                {% else %}
+                    +{{ tx.amount }} {% if tx.type == 'received' %}ETH{% else %}AVAX{% endif %}
+                {% endif %}
+            </span>
+            <span class="transaction-date">{{ moment(tx.timestamp).fromNow() }}</span>
+        </div>
+    </div>
+</div>
+
+<style>
+.transaction-content {
+    color: #fff;
+}
+
+.transaction-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.transaction-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+    min-width: 0;
+}
+
+.project-link {
+    color: var(--neon-green);
+    text-decoration: none;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-link:hover {
+    color: #80ffcd;
+}
+
+.transaction-with {
+    color: #fff;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.transaction-type {
+    color: #888;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.transaction-message {
+    color: #888;
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.transaction-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    white-space: nowrap;
+}
+
+.transaction-amount {
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+.transaction-amount.contribution,
+.transaction-amount.token_exchange_sent {
+    color: #ff003c;
+}
+
+.transaction-amount.received,
+.transaction-amount.token_exchange_received {
+    color: var(--neon-green);
+}
+
+.transaction-date {
+    color: #666;
+    font-size: 0.9em;
+}
+</style> 

@@ -1,0 +1,816 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container competitions-page">
+    <div class="page-header">
+        <h1>Research Requests</h1>
+        {% if current_user.is_authenticated %}
+        <button class="create-btn" onclick="showCreateCompetitionModal()">
+            <i class="fas fa-plus"></i> Create Research Request
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="competitions-grid">
+        {% for competition in competitions %}
+        <div class="competition-card {% if competition.status == 'inactive' %}inactive{% endif %}" 
+             onclick="window.location.href='{{ url_for('main.view_competition', competition_id=competition.id) }}'">
+            <div class="competition-header">
+                <h3>{{ competition.title }}</h3>
+                <span class="prize-pool">Prize: {{ competition.prize_amount }} AVAX</span>
+            </div>
+            <p class="competition-description">{{ competition.description[:200] }}...</p>
+            <div class="competition-footer">
+                <div class="competition-stats">
+                    <span><i class="fas fa-file-alt"></i> {{ competition.solutions|length }} Solutions</span>
+                    <span><i class="fas fa-clock"></i> {{ 'Active' if competition.status == 'active' else 'Ended' }}</span>
+                </div>
+                <span class="competition-date">Created {{ moment(competition.created_at).fromNow() }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Create Competition Modal -->
+<div id="createCompetitionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create Research Request</h2>
+            <span class="close" onclick="closeModal('createCompetitionModal')">&times;</span>
+        </div>
+        <form id="createCompetitionForm" onsubmit="submitCompetition(event)">
+            <div class="modal-tabs">
+                <button type="button" class="tab-btn active" data-step="1">Basic Info</button>
+                <button type="button" class="tab-btn" data-step="2">Description</button>
+                <button type="button" class="tab-btn" data-step="3">Files</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Step 1: Basic Info -->
+                <div class="tab-content active" data-step="1">
+                    <div class="form-group">
+                        <label for="competitionTitle">Title</label>
+                        <input type="text" id="competitionTitle" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="prizeAmount">Prize Amount (AVAX)</label>
+                        <input type="number" id="prizeAmount" name="prize_amount" step="0.01" min="0.01" required>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Description -->
+                <div class="tab-content" data-step="2">
+                    <div class="form-group">
+                        <label for="competitionDescription">Description</label>
+                        <textarea id="competitionDescription" name="description" required></textarea>
+                    </div>
+                </div>
+                
+                <!-- Step 3: Files -->
+                <div class="tab-content" data-step="3">
+                    <div class="form-group">
+                        <label>Research Request Files (Max 2 files)</label>
+                        <div class="file-upload-container" onclick="document.getElementById('competitionFiles').click()">
+                            <input type="file" id="competitionFiles" name="files" multiple accept=".pdf,.doc,.docx,.txt" 
+                                   onchange="validateFiles(this, 2)">
+                            <div class="file-upload-text">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>Drop files here or click to upload</span>
+                                <small>Maximum 2 files allowed</small>
+                            </div>
+                        </div>
+                        <div id="fileList" class="file-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeModal('createCompetitionModal')">Cancel</button>
+                <div class="step-buttons">
+                    <button type="button" class="btn-secondary prev-step" style="display: none;">Previous</button>
+                    <button type="button" class="btn-primary next-step">Next</button>
+                    <button type="submit" class="btn-primary submit-competition" style="display: none;">Create Research Request</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<style>
+.competitions-page {
+    padding: 40px 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    margin-top: 60px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.page-header h1 {
+    color: var(--neon-green);
+    margin: 0;
+}
+
+.create-btn {
+    background: var(--dark-secondary);
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.create-btn:hover {
+    background: rgba(0, 242, 157, 0.1);
+    transform: translateY(-1px);
+}
+
+.competitions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.competition-card {
+    background: var(--dark-secondary);
+    border: 1px solid rgba(0, 242, 157, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.competition-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 242, 157, 0.1);
+    border-color: rgba(0, 242, 157, 0.2);
+}
+
+.competition-card.inactive {
+    opacity: 0.7;
+}
+
+.competition-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.competition-header h3 {
+    color: #fff;
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.prize-pool {
+    color: var(--neon-green);
+    font-weight: 500;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.competition-description {
+    color: #888;
+    font-size: 0.9em;
+    line-height: 1.5;
+    margin-bottom: 15px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.competition-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85em;
+}
+
+.competition-stats {
+    display: flex;
+    gap: 15px;
+    color: #666;
+}
+
+.competition-date {
+    color: #666;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+}
+
+.modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 800px;
+    background: var(--dark-bg);
+    border: 1px solid rgba(0, 242, 157, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    padding: 20px 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h2 {
+    color: var(--neon-green);
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+}
+
+.close {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.close:hover {
+    color: var(--neon-green);
+}
+
+.modal-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 30px;
+    background: var(--dark-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn {
+    padding: 15px 25px;
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.tab-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--neon-green);
+    transform: scaleX(0);
+    transition: transform 0.2s ease;
+}
+
+.tab-btn.active {
+    color: var(--neon-green);
+}
+
+.tab-btn.active::after {
+    transform: scaleX(1);
+}
+
+.tab-content {
+    display: none;
+    padding: 30px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.modal-body {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.step-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.form-group {
+    margin: 0;
+}
+
+.form-group label {
+    display: block;
+    color: #fff;
+    margin-bottom: 8px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    background: var(--dark-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group textarea:focus {
+    border-color: var(--neon-green);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 242, 157, 0.1);
+}
+
+.form-group textarea {
+    height: 250px;
+    min-height: auto;
+    resize: none;
+}
+
+.file-upload-container {
+    margin: 10px 0;
+    border: 2px dashed rgba(0, 242, 157, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    background: var(--dark-secondary);
+    transition: all 0.2s ease;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.file-upload-container:hover {
+    border-color: var(--neon-green);
+    background: rgba(0, 242, 157, 0.05);
+}
+
+.file-upload-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #888;
+    font-size: 0.9em;
+}
+
+.file-upload-text i {
+    font-size: 24px;
+    color: var(--neon-green);
+}
+
+.file-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.9em;
+    word-break: break-all;
+}
+
+.file-item span {
+    margin-right: 10px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-item .remove-file {
+    color: #ff4757;
+    cursor: pointer;
+    padding: 4px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.file-item .remove-file:hover {
+    color: #ff6b81;
+    transform: scale(1.1);
+}
+
+/* Hide the default file input */
+input[type="file"] {
+    display: none;
+}
+
+/* Style for the custom file upload button */
+.file-upload-container {
+    cursor: pointer;
+}
+
+.file-upload-container:hover {
+    border-color: var(--neon-green);
+    background: rgba(0, 242, 157, 0.05);
+}
+
+/* Add scrollbar styling for the file list */
+.file-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.file-list::-webkit-scrollbar-track {
+    background: var(--dark-secondary);
+    border-radius: 3px;
+}
+
+.file-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 242, 157, 0.2);
+    border-radius: 3px;
+}
+
+.file-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 242, 157, 0.3);
+}
+
+.modal-footer {
+    padding: 20px 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--neon-green);
+    color: var(--dark-bg);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #00f29d;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: #888;
+    border: 1px solid #888;
+}
+
+.btn-secondary:hover {
+    color: #fff;
+    border-color: #fff;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 20px auto;
+    }
+
+    .modal-tabs {
+        padding: 0 15px;
+    }
+
+    .tab-btn {
+        padding: 12px 15px;
+        font-size: 13px;
+    }
+
+    .tab-content {
+        padding: 20px;
+    }
+
+    .modal-body {
+        max-height: 60vh;
+    }
+}
+
+/* Toast Styles */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    padding: 12px 24px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideIn 0.3s ease forwards;
+    max-width: 300px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.toast.success {
+    background: rgba(0, 242, 157, 0.9);
+}
+
+.toast.error {
+    background: rgba(255, 71, 87, 0.9);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+</style>
+
+<script>
+function showCreateCompetitionModal() {
+    const modal = document.getElementById('createCompetitionModal');
+    if (modal) {
+        modal.style.display = 'block';
+        // Reset form and step when opening modal
+        document.getElementById('createCompetitionForm').reset();
+        showStep(1);
+        // Clear file list
+        document.getElementById('fileList').innerHTML = '';
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        // Reset form when closing
+        if (modalId === 'createCompetitionModal') {
+            document.getElementById('createCompetitionForm').reset();
+            document.getElementById('fileList').innerHTML = '';
+        }
+    }
+}
+
+function validateFiles(input, maxFiles) {
+    if (input.files.length > maxFiles) {
+        alert(`Maximum ${maxFiles} files allowed`);
+        input.value = '';
+        return;
+    }
+    
+    updateFileList(input.files);
+}
+
+function updateFileList(files) {
+    const fileList = document.getElementById('fileList');
+    fileList.innerHTML = '';
+    
+    Array.from(files).forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <span>${file.name}</span>
+            <i class="fas fa-times remove-file" onclick="removeFile(this)"></i>
+        `;
+        fileList.appendChild(fileItem);
+    });
+}
+
+function removeFile(element) {
+    const fileInput = document.getElementById('competitionFiles');
+    const dt = new DataTransfer();
+    const files = fileInput.files;
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.name !== element.parentElement.querySelector('span').textContent) {
+            dt.items.add(file);
+        }
+    }
+    
+    fileInput.files = dt.files;
+    updateFileList(fileInput.files);
+}
+
+async function submitCompetition(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const files = document.getElementById('competitionFiles').files;
+    Array.from(files).forEach(file => {
+        formData.append('files[]', file);
+    });
+    
+    try {
+        const response = await fetch('/api/create-competition', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('Research Request created successfully!');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast(result.error || 'Failed to create research request', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('An error occurred while creating the research request', 'error');
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+
+let currentStep = 1;
+const totalSteps = 3;
+
+function updateStepButtons() {
+    const prevBtn = document.querySelector('.prev-step');
+    const nextBtn = document.querySelector('.next-step');
+    const submitBtn = document.querySelector('.submit-competition');
+    
+    prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
+    nextBtn.style.display = currentStep < totalSteps ? 'block' : 'none';
+    submitBtn.style.display = currentStep === totalSteps ? 'block' : 'none';
+}
+
+function validateStep(step) {
+    switch(step) {
+        case 1:
+            const title = document.getElementById('competitionTitle').value;
+            const prize = document.getElementById('prizeAmount').value;
+            return title && prize > 0;
+        case 2:
+            const description = document.getElementById('competitionDescription').value;
+            return description.length > 0;
+        case 3:
+            return true; // Files are optional
+        default:
+            return false;
+    }
+}
+
+function showStep(step) {
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    document.querySelector(`.tab-content[data-step="${step}"]`).classList.add('active');
+    document.querySelector(`.tab-btn[data-step="${step}"]`).classList.add('active');
+    
+    currentStep = step;
+    updateStepButtons();
+}
+
+document.querySelector('.next-step').addEventListener('click', () => {
+    if (validateStep(currentStep)) {
+        showStep(currentStep + 1);
+    } else {
+        showToast('Please fill in all required fields', 'error');
+    }
+});
+
+document.querySelector('.prev-step').addEventListener('click', () => {
+    showStep(currentStep - 1);
+});
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const targetStep = parseInt(btn.dataset.step);
+        if (targetStep < currentStep || validateStep(currentStep)) {
+            showStep(targetStep);
+        } else {
+            showToast('Please fill in all required fields', 'error');
+        }
+    });
+});
+
+// Initialize steps
+showStep(1);
+
+// Add drag and drop functionality
+const fileUploadContainer = document.querySelector('.file-upload-container');
+
+fileUploadContainer.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileUploadContainer.style.borderColor = 'var(--neon-green)';
+    fileUploadContainer.style.background = 'rgba(0, 242, 157, 0.05)';
+});
+
+fileUploadContainer.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileUploadContainer.style.borderColor = 'rgba(0, 242, 157, 0.2)';
+    fileUploadContainer.style.background = 'var(--dark-secondary)';
+});
+
+fileUploadContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileUploadContainer.style.borderColor = 'rgba(0, 242, 157, 0.2)';
+    fileUploadContainer.style.background = 'var(--dark-secondary)';
+    
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length > 2) {
+        showToast('Maximum 2 files allowed', 'error');
+        return;
+    }
+    
+    const fileInput = document.getElementById('competitionFiles');
+    fileInput.files = files;
+    validateFiles(fileInput, 2);
+});
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.getElementById('toast-container').appendChild(toast);
+    
+    // Remove toast after 3 seconds
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease forwards';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, 3000);
+}
+</script>
+{% endblock %} 

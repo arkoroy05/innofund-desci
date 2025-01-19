@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container notifications-page">
+    <h1>Notifications</h1>
+    <div class="notifications-list" id="notificationsList">
+        <!-- Notifications will be loaded here -->
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container"></div>
+
+<style>
+.notifications-page {
+    padding: 40px 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    margin-top: 60px;
+}
+
+.notifications-page h1 {
+    color: var(--neon-green);
+    margin-bottom: 30px;
+}
+
+.notification-item {
+    background: var(--dark-secondary);
+    border: 1px solid rgba(0, 242, 157, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.notification-item-unread {
+    border-left: 4px solid var(--neon-green);
+}
+
+.notification-item:hover {
+    border-color: var(--neon-green);
+    transform: translateY(-1px);
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.notification-type {
+    color: var(--neon-green);
+    font-size: 0.9em;
+    text-transform: capitalize;
+}
+
+.notification-date {
+    color: #666;
+    font-size: 0.85em;
+}
+
+.notification-message {
+    color: #fff;
+    margin-bottom: 15px;
+}
+
+.notification-details {
+    background: rgba(0, 242, 157, 0.05);
+    border-radius: 6px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.notification-details p {
+    margin: 8px 0;
+    color: #fff;
+    font-size: 0.95em;
+}
+
+.notification-details strong {
+    color: var(--neon-green);
+    margin-right: 8px;
+}
+
+.no-notifications {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Toast styles */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.toast {
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    color: white;
+    background: rgba(0, 0, 0, 0.8);
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast.error {
+    background: rgba(255, 0, 0, 0.8);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style>
+
+<script>
+function showToast(message, type = 'success') {
+    const container = document.querySelector('.toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+async function loadNotifications() {
+    try {
+        const response = await fetch('/api/notifications');
+        const data = await response.json();
+        
+        if (!data.success) {
+            showToast(data.error || 'Failed to load notifications', 'error');
+            return;
+        }
+        
+        const notificationsList = document.getElementById('notificationsList');
+        notificationsList.innerHTML = '';
+        
+        if (!data.notifications || data.notifications.length === 0) {
+            notificationsList.innerHTML = '<div class="no-notifications">No notifications yet</div>';
+            return;
+        }
+        
+        data.notifications.forEach(notification => {
+            const notificationElement = createNotificationElement(notification);
+            notificationsList.appendChild(notificationElement);
+        });
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+        showToast('Error loading notifications', 'error');
+    }
+}
+
+function createNotificationElement(notification) {
+    const div = document.createElement('div');
+    div.className = notification.read ? 'notification-item' : 'notification-item notification-item-unread';
+    
+    let detailsHtml = '';
+    
+    // Handle different notification types
+    if (notification.type === 'competition_win') {
+        detailsHtml = `
+            <div class="notification-details">
+                <p><strong>Competition:</strong> ${notification.competition_title || 'Unknown Competition'}</p>
+                <p><strong>Prize Amount:</strong> ${notification.prize_amount || 0} AVAX</p>
+                <p><strong>Status:</strong> Prize automatically transferred</p>
+            </div>
+        `;
+    } else if (notification.type === 'token_request') {
+        detailsHtml = `
+            <div class="notification-details">
+                <p><strong>From:</strong> ${notification.from_user_name || 'Unknown User'}</p>
+                <p><strong>Amount:</strong> ${notification.amount || 0} AVAX</p>
+                ${notification.message ? `<p><strong>Message:</strong> ${notification.message}</p>` : ''}
+            </div>
+        `;
+    } else if (notification.type === 'token_request_accepted' || notification.type === 'token_request_declined') {
+        detailsHtml = `
+            <div class="notification-details">
+                <p><strong>Amount:</strong> ${notification.amount || 0} AVAX</p>
+                <p><strong>Response from:</strong> ${notification.from_user_name || 'Unknown User'}</p>
+            </div>
+        `;
+    }
+    
+    const typeDisplay = notification.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    div.innerHTML = `
+        <div class="notification-header">
+            <span class="notification-type">${typeDisplay}</span>
+            <span class="notification-date">${moment(notification.timestamp).fromNow()}</span>
+        </div>
+        <div class="notification-message">${notification.message || ''}</div>
+        ${detailsHtml}
+    `;
+    
+    return div;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadNotifications();
+});
+</script>
+{% endblock %} 

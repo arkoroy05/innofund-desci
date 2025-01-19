@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    {% block styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {% endblock %}
+    {{ moment.include_moment() }}
+</head>
+<body>
+    {% block navbar %}
+    <nav class="top-nav">
+        <div class="nav-brand">
+            <a
+            href="{% if current_user.is_authenticated %}{{ url_for('main.dashboard') }}{% else %}{{ url_for('main.index') }}{% endif %}"
+          >
+            <img
+              src="{{ url_for('static', filename='images/xypher-logo.svg') }}"
+              alt="InnoFund"
+              width="40"
+              height="40"
+              style="filter: invert()"
+            >
+          </a>
+        </div>
+        <div class="nav-links">
+            {% if current_user.is_authenticated %}
+                <button class="nav-btn wallet {% if current_user.wallet_address %}connected{% endif %}" 
+                        onclick="handleWalletClick('{% if current_user.wallet_address %}showWallet{% else %}{{ url_for('main.connect_wallet') }}{% endif %}')">
+                    {% if current_user.wallet_address %}
+                        {{ current_user.wallet_address[:6] }}...{{ current_user.wallet_address[-4:] }}
+                    {% else %}
+                        Connect Wallet
+                    {% endif %}
+                </button>
+                <div class="nav-dropdown">
+                    <a href="#" class="nav-btn">Projects</a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('main.create_project') }}" class="dropdown-item">Create Project</a>
+                        <a href="{{ url_for('main.my_projects') }}" class="dropdown-item">My Projects</a>
+                        <a href="#" class="dropdown-item">Browse Projects</a>
+                    </div>
+                </div>
+                <a href="{{ url_for('main.competitions') }}" class="nav-btn">Research Requests</a>
+                <a href="{{ url_for('main.leaderboard') }}" class="nav-btn">Leaderboard</a>
+                <a href="{{ url_for('main.about') }}" class="nav-btn">About</a>
+                
+                <!-- Notifications Dropdown -->
+                <div class="notifications-nav">
+                    <a href="{{ url_for('main.notifications') }}" class="notifications-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
+                    </a>
+                </div>
+
+                <div class="profile-nav">
+                    <div class="profile-dropdown">
+                        {% if current_user.photo_url %}
+                            <img src="{{ current_user.photo_url }}" alt="Profile" class="nav-profile-photo">
+                        {% else %}
+                            <div class="nav-profile-placeholder">
+                                {{ current_user.display_name[0] }}
+                            </div>
+                        {% endif %}
+                        <div class="dropdown-content">
+                            <a href="{{ url_for('main.profile') }}" class="dropdown-item">Profile</a>
+                            <a href="{{ url_for('main.transaction_history') }}" class="dropdown-item">Transaction History</a>
+                            <a href="{{ url_for('auth.logout') }}" class="dropdown-item">Logout</a>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <a href="{{ url_for('main.about') }}" class="nav-btn">About</a>
+                <a href="{{ url_for('auth.login') }}" class="nav-btn">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+    {% endblock %}
+
+    {% block content %}{% endblock %}
+
+    {% block scripts %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    function handleWalletClick(action) {
+        if (action === 'showWallet') {
+            showWalletInfo();
+        } else {
+            window.location.href = action;
+        }
+    }
+    </script>
+    {% endblock %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+</body>
+</html> 
